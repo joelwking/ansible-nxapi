@@ -7,6 +7,7 @@
      Revision history:
      30  January 2015  |  1.0 - initial release
      19  Feb     2015  |  1.1 - tested thru ./ansible/hacking/test-module
+     11  March   2015  |  1.2 - logic for configuration errors
 
 """
 
@@ -14,7 +15,7 @@ DOCUMENTATION = '''
 ---
 module: nxapi_install_config
 author: Joel W. King, World Wide Technology
-version_added: "1.1"
+version_added: "1.2"
 short_description: Load a configuration file into a device running NXOS feature nxapi
 description:
     - This module reads a configuration file and uses the nxapi feature to push the configuration
@@ -115,7 +116,7 @@ logger.addHandler(hdlrObj)
 
 class Connection(object):
     """
-        connection object for Cisco Nexus 9000 feature nxapi
+        connection object for Cisco Nexus 9000 / 3000 feature nxapi
     """
     def __init__(self, log_obj, username, password):   
           
@@ -128,6 +129,7 @@ class Connection(object):
         self.header = {'content-type':'application/json-rpc'}
         self.payload = []
         self.changed = False
+
 
 
     def debugging(self):
@@ -160,8 +162,25 @@ class Connection(object):
                     changed +=1
             except KeyError:
                 pass
+
         if changed:
             self.changed = True
+
+
+
+    def check_for_errors(self, rc, response):
+        """ for any command line, if we have an error message, there was a problem. Subsequent commands
+            will not be executed, that message will be 'Command not ran due to previous failures'
+            so once you find and error, return the message of the first error.
+        """
+        for cmd in response:
+            try:
+                response = "%s on line %s" % (cmd["error"]["message"], cmd["id"])
+                rc = 1
+                break
+            except KeyError:
+                pass
+        return rc, response
 
 
 
@@ -186,8 +205,8 @@ class Connection(object):
         except ValueError as e:
             return 1, ("ValueError: %s" % e)
         else:
-            self.set_changed_flag(response)
-            return 0, response
+            self.set_changed_flag(response)                # the configuration can be changed even if errors   
+            return self.check_for_errors(0, response)      # modify rc, response if errors existed.
 
 
     def load_config_file(self, config_file):
@@ -200,8 +219,11 @@ class Connection(object):
             i = 0
             for line in f:
                 line = line.rstrip('\n')                   # remove newline characters
-                if line[0] == "#":                         # ignore comment lines
-                    continue
+                if line:                                   # line could empty - a blank line,  at this point
+                    if line[0] == "#":                     # ignore comment lines
+                        continue
+                else:
+                    continue                               # ignore blank lines
                 i += 1
                 self.payload.append({"jsonrpc": "2.0", "method": "cli", "params": {"cmd": line, "version": 1}, "id": i})
                 if self.debugging():
@@ -229,6 +251,7 @@ def main():
     
     switch = Connection(logger, module.params["username"], module.params["password"])
     switch.set_url(module.params["host"])
+
     try:
         switch.set_debug(module.params["debug"])
     except KeyError:
