@@ -1,13 +1,14 @@
 #!/usr/bin/python
 
 """
-     Copyright (c) 2014 World Wide Technology, Inc. 
+     Copyright (c) 2015 World Wide Technology, Inc. 
      All rights reserved. 
 
      Revision history:
      30  January 2015  |  1.0 - initial release
      19  Feb     2015  |  1.1 - tested thru ./ansible/hacking/test-module
      11  March   2015  |  1.2 - logic for configuration errors
+     28  July    2015  |  1.3 - added license file to project and updated copyright
 
 """
 
@@ -15,7 +16,7 @@ DOCUMENTATION = '''
 ---
 module: nxapi_install_config
 author: Joel W. King, World Wide Technology
-version_added: "1.2"
+version_added: "1.3"
 short_description: Load a configuration file into a device running NXOS feature nxapi
 description:
     - This module reads a configuration file and uses the nxapi feature to push the configuration
