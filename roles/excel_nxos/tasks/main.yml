@@ -1,0 +1,26 @@
+---
+# tasks file for excel_nxos 
+  - name: Decrypt the password file
+    include_vars: ./playbooks/passwords.yml
+
+  - name: Import facts from a CSV file
+    csv_to_facts:
+      src: "./roles/{{role}}/files/{{hostname}}.csv" 
+
+  - name: Optionally display the facts
+    debug: var=spreadsheet
+
+  - name: switch interface configuration file 
+    template:
+      src: interfaces.j2
+      dest: "./roles/{{role}}/files/__{{hostname}}_interfaces.cfg"
+
+  - name: Configure the Nexus through the NX-API 
+    nxapi_install_config:  
+      config_file: "./roles/{{role}}/files/__{{hostname}}_interfaces.cfg" 
+      host: "{{inventory_hostname}}" 
+      username: "{{username}}" 
+      password: "{{password}}"
+      debug: "{{debug}}" 
+
+

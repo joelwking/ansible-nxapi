@@ -9,6 +9,7 @@
      19  Feb     2015  |  1.1 - tested thru ./ansible/hacking/test-module
      11  March   2015  |  1.2 - logic for configuration errors
      28  July    2015  |  1.3 - added license file to project and updated copyright
+     25  Sept    2015  |  1.4 - implement HTTPs, ignore comments beginning with ! as well
 
 """
 
@@ -16,7 +17,7 @@ DOCUMENTATION = '''
 ---
 module: nxapi_install_config
 author: Joel W. King, World Wide Technology
-version_added: "1.3"
+version_added: "1.4"
 short_description: Load a configuration file into a device running NXOS feature nxapi
 description:
     - This module reads a configuration file and uses the nxapi feature to push the configuration
@@ -87,8 +88,8 @@ EXAMPLES = '''
          template: src=NEX-9396.j2 dest=/home/administrator/ansible/CFGS/{{hostname}}.txt
 
        - name: Push configuration to devices
-         nxapi_install_config.py:  config_file=/home/administrator/ansible/CFGS/{{hostname}}.txt host={{host}} username={{username}} password
-={{password}} debug={{debug}}
+         nxapi_install_config.py:  config_file=/home/administrator/ansible/CFGS/{{hostname}}.txt host={{host}} username={{username}}  
+                                  password={{password}} debug={{debug}}
 
 '''
 
@@ -124,7 +125,7 @@ class Connection(object):
         self.debug = False
         self.logger = log_obj
         self.logger.setLevel(logging.INFO)
-        self.url = 'http://10.255.139.185/ins'
+        self.url = 'https://10.255.139.185/ins'
         self.username = username
         self.password = password
         self.header = {'content-type':'application/json-rpc'}
@@ -187,7 +188,7 @@ class Connection(object):
 
     def set_url(self, hostname):
        "set the IP address of hostname in the URL "
-       self.url = 'http://%s/ins' % hostname
+       self.url = 'https://%s/ins' % hostname
 
 
     def genericPOST(self):
@@ -200,6 +201,7 @@ class Connection(object):
             response = requests.post(self.url, 
                                      data=json.dumps(self.payload), 
                                      headers=self.header,
+                                     verify=False,
                                      auth=(self.username, self.password)).json()
         except requests.ConnectionError as e: 
             return 1, ("ConnectionError: %s" % e)
@@ -221,7 +223,7 @@ class Connection(object):
             for line in f:
                 line = line.rstrip('\n')                   # remove newline characters
                 if line:                                   # line could empty - a blank line,  at this point
-                    if line[0] == "#":                     # ignore comment lines
+                    if line[0] in "#!":                    # ignore comments, lines starting with # or !
                         continue
                 else:
                     continue                               # ignore blank lines
