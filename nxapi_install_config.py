@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
 """
-     Copyright (c) 2015 World Wide Technology, Inc. 
-     All rights reserved. 
+     Copyright (c) 2015 World Wide Technology, Inc.
+     All rights reserved.
 
      Revision history:
      30  January 2015  |  1.0 - initial release
@@ -10,6 +10,7 @@
      11  March   2015  |  1.2 - logic for configuration errors
      28  July    2015  |  1.3 - added license file to project and updated copyright
      25  Sept    2015  |  1.4 - implement HTTPs, ignore comments beginning with ! as well
+     27  Sept    2015  |  1.5 - added userid to log file name
 
 """
 
@@ -17,7 +18,7 @@ DOCUMENTATION = '''
 ---
 module: nxapi_install_config
 author: Joel W. King, World Wide Technology
-version_added: "1.4"
+version_added: "1.5"
 short_description: Load a configuration file into a device running NXOS feature nxapi
 description:
     - This module reads a configuration file and uses the nxapi feature to push the configuration
@@ -93,13 +94,11 @@ EXAMPLES = '''
 
 '''
 
-import sys
-import os
 import time
 import json
-import shlex
 import requests
 import logging
+import getpass
 
 # ---------------------------------------------------------------------------
 # LOGGING
@@ -107,7 +106,7 @@ import logging
 
 logfilename = 'nxapi_install_config'
 logger = logging.getLogger(logfilename)
-hdlrObj = logging.FileHandler("/tmp/%s_%s.log" % (logfilename, time.strftime("%j")))
+hdlrObj = logging.FileHandler("/tmp/%s_%s_%s.log" % (logfilename, getpass.getuser(), time.strftime("%j")))
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 hdlrObj.setFormatter(formatter)
 logger.addHandler(hdlrObj)
@@ -120,8 +119,8 @@ class Connection(object):
     """
         connection object for Cisco Nexus 9000 / 3000 feature nxapi
     """
-    def __init__(self, log_obj, username, password):   
-          
+    def __init__(self, log_obj, username, password):
+
         self.debug = False
         self.logger = log_obj
         self.logger.setLevel(logging.INFO)
@@ -145,7 +144,7 @@ class Connection(object):
             self.debug = True
             self.logger.setLevel(logging.DEBUG)
         self.logger.debug("exiting set_debug with self.debug=%s" % self.debug)
-        
+
 
     def get_changed_flag(self):
         "show commands do not change the configuration, config commands do"
@@ -154,7 +153,7 @@ class Connection(object):
 
 
     def set_changed_flag(self, response):
-        """look at all the comand lines, if at least one has None, then 
+        """look at all the comand lines, if at least one has None, then
            the configuration was changed"""
 
         changed = 0
@@ -187,28 +186,28 @@ class Connection(object):
 
 
     def set_url(self, hostname):
-       "set the IP address of hostname in the URL "
-       self.url = 'https://%s/ins' % hostname
+        "set the IP address of hostname in the URL "
+        self.url = 'https://%s/ins' % hostname
 
 
     def genericPOST(self):
         """ issues a post request to Nexus nxapi """
-        
+
         if self.debugging():
             self.logger.debug("entering genericPOST")
 
         try:
-            response = requests.post(self.url, 
-                                     data=json.dumps(self.payload), 
+            response = requests.post(self.url,
+                                     data=json.dumps(self.payload),
                                      headers=self.header,
                                      verify=False,
                                      auth=(self.username, self.password)).json()
-        except requests.ConnectionError as e: 
+        except requests.ConnectionError as e:
             return 1, ("ConnectionError: %s" % e)
         except ValueError as e:
             return 1, ("ValueError: %s" % e)
         else:
-            self.set_changed_flag(response)                # the configuration can be changed even if errors   
+            self.set_changed_flag(response)                # the configuration can be changed even if errors
             return self.check_for_errors(0, response)      # modify rc, response if errors existed.
 
 
@@ -231,7 +230,7 @@ class Connection(object):
                 self.payload.append({"jsonrpc": "2.0", "method": "cli", "params": {"cmd": line, "version": 1}, "id": i})
                 if self.debugging():
                     self.logger.debug("id: %s cmd: %s" % (i, line))
-                
+
 
 
 # ---------------------------------------------------------------------------
@@ -251,14 +250,14 @@ def main():
         check_invalid_arguments=False,
         add_file_common_args=True
     )
-    
+
     switch = Connection(logger, module.params["username"], module.params["password"])
     switch.set_url(module.params["host"])
 
     try:
         switch.set_debug(module.params["debug"])
     except KeyError:
-        pass    
+        pass
 
     switch.load_config_file(module.params["config_file"])
 
@@ -286,9 +285,9 @@ main()
 #            datacenter/nexus9000
 #            https://github.com/datacenter/nexus9000/tree/master/nx-os/nxapi
 #
-#            Cisco Nexus 9000 Series NX-OS Programmability Guide, Release 6.x 
+#            Cisco Nexus 9000 Series NX-OS Programmability Guide, Release 6.x
 #            http://www.cisco.com/c/en/us/td/docs/switches/datacenter/nexus9000/sw/6-x/programmability/guide/b_Cisco_Nexus_9000_Series_NX-OS_Programmability_Guide.pdf
-#            
+#
 #
 #           Developing Modules - 
 #           http://docs.ansible.com/developing_modules.html
