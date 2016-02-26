@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 """
-     Copyright (c) 2015 World Wide Technology, Inc.
+     Copyright (c) 2015 - 2016 World Wide Technology, Inc.
      All rights reserved.
 
      Revision history:
@@ -11,6 +11,7 @@
      28  July    2015  |  1.3 - added license file to project and updated copyright
      25  Sept    2015  |  1.4 - implement HTTPs, ignore comments beginning with ! as well
      27  Sept    2015  |  1.5 - added userid to log file name
+     26  Feb     2016  |  2.0 - Ansible 2.0 fix for debug boolean
 
 """
 
@@ -18,7 +19,7 @@ DOCUMENTATION = '''
 ---
 module: nxapi_install_config
 author: Joel W. King, World Wide Technology
-version_added: "1.5"
+version_added: "2.0"
 short_description: Load a configuration file into a device running NXOS feature nxapi
 description:
     - This module reads a configuration file and uses the nxapi feature to push the configuration
@@ -56,41 +57,24 @@ options:
 
     debug:
         description:
-            - Debugging output enabled when value set to any of "True, true, On, on"
+            - Debugging output enabled when value set to True
         required: false
 '''
 
 EXAMPLES = '''
        
-   INITIAL TESTING
+     - name: Generate Nexus configuration files
+       template:
+        src: "./roles/{{role_path|basename}}/templates/nxapi_template.j2"
+        dest: "./roles/{{role_path|basename}}/files/__{{hostname}}.cfg"
 
-       from /home/administrator
-       export PYTHONPATH=/home/administrator/ansible/lib
-       ./ansible/hacking/test-module -m ~/ansible/lib/ansible/modules/extras/network/nxapi_install_config.py
-
-       -a "config_file=/home/administrator/ansible/CFGS/cary.txt host=10.255.139.185 username=admin password=Cisc0123 debug=true"
-
-       when running from the hacking test-module, you can include print statements and they will be displayed under RAW OUTPUT
-
-
-    SINGLE HOST   
-
-       cd ~/ansible
-       ./bin/ansible localhost -m ~/ansible/lib/ansible/modules/extras/network/nxapi_install_config.py -a "config_file=/home/administrator/ansible/CFGS/cary.txt host=10.255.139.185 username=admin password=Cisc0123 debug=true" -i ./ansible_hosts --ask-pass
-
-
-    PLAYBOOK
-
-       This is an example of a playbook that generates the configuration files and the pushes the configuration to the devices.
-
-      ~/ansible/roles/router/tasks/main.yml
-       ---
-       - name: Generate Nexus configuration files
-         template: src=NEX-9396.j2 dest=/home/administrator/ansible/CFGS/{{hostname}}.txt
-
-       - name: Push configuration to devices
-         nxapi_install_config.py:  config_file=/home/administrator/ansible/CFGS/{{hostname}}.txt host={{host}} username={{username}}  
-                                  password={{password}} debug={{debug}}
+     - name: Push configuration to devices
+       nxapi_install_config.py:
+        config_file: "./roles/{{role_path|basename}}/files/__{{hostname}}.cfg"
+        host: "{{host}}"
+        username: "{{username}}"
+        password: "{{password}}"
+        debug: "{{debug}}"
 
 '''
 
@@ -138,12 +122,14 @@ class Connection(object):
         return self.debug
 
 
+
     def set_debug(self, value):
         "set the debug value"
-        if value in "true True on On":
+        if value:
             self.debug = True
             self.logger.setLevel(logging.DEBUG)
         self.logger.debug("exiting set_debug with self.debug=%s" % self.debug)
+
 
 
     def get_changed_flag(self):
@@ -190,6 +176,7 @@ class Connection(object):
         self.url = 'https://%s/ins' % hostname
 
 
+
     def genericPOST(self):
         """ issues a post request to Nexus nxapi """
 
@@ -209,6 +196,7 @@ class Connection(object):
         else:
             self.set_changed_flag(response)                # the configuration can be changed even if errors
             return self.check_for_errors(0, response)      # modify rc, response if errors existed.
+
 
 
     def load_config_file(self, config_file):
@@ -245,7 +233,7 @@ def main():
             host = dict(required=True),
             username = dict(required=True),
             password  = dict(required=True),
-            debug = dict(required=False)
+            debug = dict(required=False, default=False, choices=BOOLEANS)
          ),
         check_invalid_arguments=False,
         add_file_common_args=True
