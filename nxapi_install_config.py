@@ -12,6 +12,7 @@
      25  Sept    2015  |  1.4 - implement HTTPs, ignore comments beginning with ! as well
      27  Sept    2015  |  1.5 - added userid to log file name
      26  Feb     2016  |  2.0 - Ansible 2.0 fix for debug boolean
+     09  Mar     2016  |  2.1 - Added better error reporting for requests post command
 
 """
 
@@ -19,7 +20,7 @@ DOCUMENTATION = '''
 ---
 module: nxapi_install_config
 author: Joel W. King, World Wide Technology
-version_added: "2.0"
+version_added: "2.1"
 short_description: Load a configuration file into a device running NXOS feature nxapi
 description:
     - This module reads a configuration file and uses the nxapi feature to push the configuration
@@ -108,7 +109,8 @@ class Connection(object):
         self.debug = False
         self.logger = log_obj
         self.logger.setLevel(logging.INFO)
-        self.url = 'https://10.255.139.185/ins'
+        self.url = 'https://192.0.2.1/ins'
+        self.hostname = 'example.net'
         self.username = username
         self.password = password
         self.header = {'content-type':'application/json-rpc'}
@@ -128,7 +130,13 @@ class Connection(object):
         if value:
             self.debug = True
             self.logger.setLevel(logging.DEBUG)
-        self.logger.debug("exiting set_debug with self.debug=%s" % self.debug)
+        self.logger.debug("DEVICE=%s exiting set_debug with self.debug=%s" % (self.get_hostname(), self.debug))
+
+
+
+    def get_hostname(self):
+        "return the hostname"
+        return self.hostname
 
 
 
@@ -174,28 +182,37 @@ class Connection(object):
     def set_url(self, hostname):
         "set the IP address of hostname in the URL "
         self.url = 'https://%s/ins' % hostname
+        self.hostname = hostname
 
 
 
     def genericPOST(self):
-        """ issues a post request to Nexus nxapi """
+        """ issues a post request to Nexus nxapi 
+            note: the python code example off the sandbox will fail on a ValueError if 
+            an incorrect username or password is provided, and not give you a status_code"""
 
         if self.debugging():
-            self.logger.debug("entering genericPOST")
+            self.logger.debug("DEVICE=%s entering genericPOST" % self.get_hostname())
 
         try:
             response = requests.post(self.url,
                                      data=json.dumps(self.payload),
                                      headers=self.header,
                                      verify=False,
-                                     auth=(self.username, self.password)).json()
+                                     auth=(self.username, self.password)) 
         except requests.ConnectionError as e:
             return 1, ("ConnectionError: %s" % e)
         except ValueError as e:
             return 1, ("ValueError: %s" % e)
         else:
-            self.set_changed_flag(response)                # the configuration can be changed even if errors
-            return self.check_for_errors(0, response)      # modify rc, response if errors existed.
+            if response.status_code == 200:
+                content = json.loads(response.content)
+                if type(content) == dict:
+                    content = [content]                       # when only one cmd sent, you get a dictionary back, >1, a list
+                self.set_changed_flag(content)                # the configuration can be changed even if errors
+                return self.check_for_errors(0, content)      # modify rc, response if errors existed.
+            else:
+                return 1, ("Failed connection, status_code: %s" % response.status_code)
 
 
 
@@ -203,7 +220,7 @@ class Connection(object):
         """ load the config file template into the payload. Each command is a dictionary element of a list"""
 
         if self.debugging():
-            self.logger.debug("Entering load_config_file with filename=%s" % config_file)
+            self.logger.debug("DEVICE=%s Entering load_config_file with filename=%s" % (self.get_hostname(),config_file))
 
         with open(config_file, 'r') as f:
             i = 0
@@ -217,7 +234,7 @@ class Connection(object):
                 i += 1
                 self.payload.append({"jsonrpc": "2.0", "method": "cli", "params": {"cmd": line, "version": 1}, "id": i})
                 if self.debugging():
-                    self.logger.debug("id: %s cmd: %s" % (i, line))
+                    self.logger.debug("DEVICE=%s id: %s cmd: %s" % (self.get_hostname(), i, line))
 
 
 
