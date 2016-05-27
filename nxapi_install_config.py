@@ -13,6 +13,7 @@
      27  Sept    2015  |  1.5 - added userid to log file name
      26  Feb     2016  |  2.0 - Ansible 2.0 fix for debug boolean
      09  Mar     2016  |  2.1 - Added better error reporting for requests post command
+     27  May     2016  |  2.2 - type="bool" on debug  Ansible 2.1
 
 """
 
@@ -20,7 +21,7 @@ DOCUMENTATION = '''
 ---
 module: nxapi_install_config
 author: Joel W. King, World Wide Technology
-version_added: "2.1"
+version_added: "2.2"
 short_description: Load a configuration file into a device running NXOS feature nxapi
 description:
     - This module reads a configuration file and uses the nxapi feature to push the configuration
@@ -250,7 +251,7 @@ def main():
             host = dict(required=True),
             username = dict(required=True),
             password  = dict(required=True),
-            debug = dict(required=False, default=False, choices=BOOLEANS)
+            debug = dict(required=False, default=False, type="bool")
          ),
         check_invalid_arguments=False,
         add_file_common_args=True
