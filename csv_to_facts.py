@@ -1,28 +1,26 @@
 #!/usr/bin/env python
-
-"""
-     Copyright (c) 2015 World Wide Technology, Inc.
-     All rights reserved.
-
-     Revision history:
-     26 Sept 2015  |  1.0 - initial release
-
-
-"""
+#
+#     Copyright (c) 2019 World Wide Technology, Inc. All rights reserved.
+#     GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+#
+ANSIBLE_METADATA = {
+    'metadata_version': '1.1',
+    'status': ['preview'],
+    'supported_by': '@joelwking'
+}
 
 DOCUMENTATION = '''
 ---
-module: csv_to_facts.py
-author: Joel W. King, World Wide Technology
-version_added: "1.01"
-short_description: Read a CSV file and output Ansible facts
-description:
-    - Read the CSV file specified and output Ansible facts in the form of a list with each
-      element in the list as a dictionary using the column header as the key and the contents
-      of the cell as the value.
+module: csv_to_facts
+short_description: Reads a CSV file and returns as ansible facts a list of dictionaries for each row
 
-requirements:
-    - None
+version_added: "2.8"
+
+description:
+    - Reads the CSV file specified and output Ansible facts in the form of a list with each
+    - element in the list as a dictionary. The column header is used as the key and the contents
+    - of the cell as the value. Also returns a dictionary with each column header as a key, the
+    - value is a list of unique values for the column, a set.
 
 options:
     src:
@@ -32,78 +30,98 @@ options:
 
     table:
         description:
-            - The name of the list created
-            - defaults to 'spreadsheet'
+            - The name of the list created, defaults to 'spreadsheet'
         required: false
 
+    unique:
+        description:
+            - The variable name of containing a dictionary of unique values for each column
+            - defaults to 'spreadsheet_set'
+        required: false
 
+author:
+    - Joel W. King (@joelwking)
 '''
 
 EXAMPLES = '''
 
-    Running the module
+  - name: Read CSV and return as ansible_facts
+    hosts: localhost
+    vars:
+      ifile: "./files/f5_wide_IP.csv"
 
-      ansible  localhost  -m csv_to_facts -a "src=/tmp/TonyA.csv"
-      ansible  localhost  -m csv_to_facts -a "src=/tmp/TonyA.csv table=my_data"
-
-    In a role configuration, given a group and host entry
-
-      [asante]
-      NEX-3048-E.sandbox.wwtatc.local  ansible_connection=local ansible_ssh_user=kingjoe hostname=13leafzn02-rp01
-      #
-
-      $ cat asante.yml
-      ---
-      - name: Test  Role
-        hosts: asante
-
-        roles:
-          - {role: excel_nxos, debug: on}
-
-
-      $ ansible-playbook asante.yml --ask-vault
+    tasks:
+    - name: Get facts from CSV file
+      csv_to_facts:
+        src: '{{ ifile }}'
+        table: f5
+        unique: f5_set
+    - debug:
+        msg: 'port: {{ item }}'
+      loop: '{{ f5_set.port }}'
 
 '''
 
 import csv
+from ansible.module_utils.basic import AnsibleModule
 
-# ---------------------------------------------------------------------------
-# read_csv_dict
-# ---------------------------------------------------------------------------
 
-def read_csv_dict(input_file, table_name):
-    "Read the CSV file and return as Ansible factsn"
-    result = {"ansible_facts":{}}
-    spreadsheet = {table_name:[]}
+def read_csv_dict(input_file, table_name, unique):
+    "Read the CSV file and return as Ansible facts"
+
+    result = {"ansible_facts": {}}
+    spreadsheet = {table_name: [],
+                   unique: {}
+                   }
 
     try:
         with open(input_file) as csvfile:
             reader = csv.DictReader(csvfile, delimiter=',', quotechar='"')
             for row in reader:
-                 spreadsheet[table_name].append(row)
+                spreadsheet[table_name].append(row)
     except IOError:
         return (1, "IOError on input file:%s" % input_file)
 
     csvfile.close()
 
+    spreadsheet[unique] = create_set(spreadsheet[table_name])
+
     result["ansible_facts"] = spreadsheet
     return (0, result)
 
-# ---------------------------------------------------------------------------
-# MAIN
-# ---------------------------------------------------------------------------
+
+def create_set(rows):
+    """
+        Return a dictionary with the column headers as keys, and the values are a
+        list of unique values found in the rows of the spreadsheet for the column
+        header (a set).
+
+    """
+    column_headers = {}                                    # create empty dictionary
+    for key in rows[0].keys():                             # get column headers
+        column_headers[key] = set()                        # create empty set for each header
+
+    for row in rows:                                       # loop thru spreadsheet
+        for key in row.keys():                             # for each column
+            column_headers[key].add(row[key])              # populate the unique values
+
+    return column_headers
+
 
 def main():
-    " "
-    module = AnsibleModule(argument_spec = dict(
-             src = dict(required=True, type='str'),
-             table = dict(default='spreadsheet', required=False, type='str')
-             ),
-             check_invalid_arguments=False,
-             add_file_common_args=True)
+    """
+    MAIN
+    """
+    module = AnsibleModule(argument_spec=dict(
+                 src=dict(required=True, type='str'),
+                 table=dict(default='spreadsheet', required=False, type='str'),
+                 unique=dict(default='spreadsheet_set', required=False, type='str')
+                 ),
+                 add_file_common_args=True)
 
     code, response = read_csv_dict(module.params["src"],
-                                   module.params["table"])
+                                   module.params["table"],
+                                   module.params["unique"])
     if code == 1:
         module.fail_json(msg=response)
     else:
@@ -112,6 +130,4 @@ def main():
     return code
 
 
-from ansible.module_utils.basic import *
 main()
-#
