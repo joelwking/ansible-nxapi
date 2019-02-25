@@ -33,10 +33,11 @@ options:
             - The name of the list created, defaults to 'spreadsheet'
         required: false
 
-    unique:
+    vsheets:
         description:
-            - The variable name of containing a dictionary of unique values for each column
-            - defaults to 'spreadsheet_set'
+            - A list of dictionaries. The key is the namespace to store the results, the values
+            - are the fields to select from the spreadsheet, creating a virtual spreadsheet with
+            - using the fields specified. Defaults to empty list
         required: false
 
 author:
@@ -48,41 +49,41 @@ EXAMPLES = '''
   - name: Read CSV and return as ansible_facts
     hosts: localhost
     vars:
-      ifile: "./files/f5_wide_IP.csv"
-
+      ifile: "./files/aci_tenant_policy.csv"
+ 
+      TEST DATA
+      spreadsheet = [ {'Tenant':'INTERNAL', 'BD': 'BD1', 'VRF': 'green', 'subnet': ''},
+                      {'Tenant':'EXTERNAL', 'BD': 'BD2', 'VRF': 'blue', 'subnet': '198.51.100.1/24'},
+                      {'Tenant':'INTERNAL', 'BD': 'BD1', 'VRF': 'green', 'subnet': '192.0.2.1/24'}  ]
     tasks:
     - name: Get facts from CSV file
       csv_to_facts:
         src: '{{ ifile }}'
         table: f5
-        unique: f5_set
-    - debug:
-        msg: 'port: {{ item }}'
-      loop: '{{ f5_set.port }}'
+        vsheets: 
+          - BD_fields:
+              - Tenant
+              - VRF
+              - BD
+          - VRF_fields
+              - Tenant
+              - VRF
 
 '''
 
 import csv
 from ansible.module_utils.basic import AnsibleModule
 
+ERROR = 1
+OK = 0
 
 class virt_spreadsheet(object):
     """
         Given a spreadsheet, we take each name and values entered as arguments, and
         create a virtual spreadsheet
-        ### ask
-          - name: BD_fields
-            fields: 
-              - Tenant
-              - VRF
-              - BD
-          - name: VRF_fields
-            fields:
-              - Tenant
-              - VRF
-              
     """
     def __init__(self, name, values, spreadsheet):
+      #                'VRF_fields', ['Tenant', 'VRF'], spreadsheet 
         self.name = name
         self.values = values
         self.spreadsheet = spreadsheet
@@ -97,19 +98,21 @@ class virt_spreadsheet(object):
                 try:
                     virt_row[column_header] = row[column_header] 
                 except KeyError:
-                    self.error = 'they asked for a column which does not exist in the spreadsheet'
+                    self.error = 'column requested does not exist'
 
             self.virt_set.add(tuple(virt_row.items()))            
         for item in self.virt_set:
             self.virt_sheet.append(dict(item))
 
 
-def read_csv_dict(input_file, table_name, unique, vsheets):
-    "Read the CSV file and return as Ansible facts"
+def read_csv_dict(input_file, table_name, vsheets):
+    """ 
+        TODO
+    """
 
     result = {"ansible_facts": {}}
     spreadsheet = {table_name: [],
-                   unique: {}
+                   # vsheet name(s): []
                    }
 
     try:
@@ -118,47 +121,26 @@ def read_csv_dict(input_file, table_name, unique, vsheets):
             for row in reader:
                 spreadsheet[table_name].append(row)
     except IOError:
-        return (1, "IOError on input file:%s" % input_file)
+        return (ERROR, "IOError on input file:%s" % input_file)
 
     csvfile.close()
-
     #
-    #  Create virtual sheets
+    # Optionally create virtual spreadsheets with a unique row for the values 
     #
-    for ask in vsheets:
-        obj = virt_spreadsheet(ask.get('name'), ask.get('values'), spreadsheet[table_name])
+    for item in vsheets:
+        if len(item) not == 1:
+            return(ERROR, "only one virtual sheet name per item")
+           
+        obj = virt_spreadsheet(item.keys()[0], item[item.keys()[0]], spreadsheet[table_name])
         obj.populate_sheet()
         if obj.error:
-          return (1, obj.error)
-        spreadsheet[ask.get('name')] = obj.virt_sheet
-
+            return(ERROR, obj.error)
+        spreadsheet[obj.name] = obj.virt_sheet             # add the virtual sheet set to the results
+    # 
+    # Store the entire file as a list of dictionaries in the table name (and virtual sheet names) requested
     #
-    #  Unique values for each column.
-    #
-    spreadsheet[unique] = create_set(spreadsheet[table_name])
-
-    result["ansible_facts"] = spreadsheet
-    return (0, result)
-
-
-
-def create_set(rows):
-    """
-        Return a dictionary with the column headers as keys, and the values are a
-        list of unique values found in the rows of the spreadsheet for the column
-        header (a set).
-
-    """
-    column_headers = {}                                    # create empty dictionary
-    for key in rows[0].keys():                             # get column headers
-        column_headers[key] = set()                        # create empty set for each header
-
-    for row in rows:                                       # loop thru spreadsheet
-        for key in row.keys():                             # for each column
-            column_headers[key].add(row[key])              # populate the unique values
-
-    return column_headers
-
+    result["ansible_facts"] = spreadsheet         
+    return (OK, result)
 
 def main():
     """
@@ -167,16 +149,14 @@ def main():
     module = AnsibleModule(argument_spec=dict(
                  src=dict(required=True, type='str'),
                  table=dict(default='spreadsheet', required=False, type='str'),
-                 unique=dict(default='spreadsheet_set', required=False, type='str'),
                  vsheets=dict(default=[], required=False, type='list')
                  ),
                  add_file_common_args=True)
 
     code, response = read_csv_dict(module.params["src"],
                                    module.params["table"],
-                                   module.params["unique"],
                                    module.params['vsheets'])
-    if code == 1:
+    if code == ERROR:
         module.fail_json(msg=response)
     else:
         module.exit_json(**response)
@@ -185,12 +165,3 @@ def main():
 
 
 main()
-
-##############################################################################################################
-
-"""
-TEST DATA
-spreadsheet = [ {'Tenant':'WWT-INT', 'BD': 'WWT-BD1', 'VRF': 'WWT-VRF1'},
-                {'Tenant':'WWT-EXT', 'BD': 'WWT-BD2', 'VRF': 'WWT-VRF1'},
-                {'Tenant':'WWT-INT', 'BD': 'WWT-BD1', 'VRF': 'WWT-VRF1'}  ]
-"""
