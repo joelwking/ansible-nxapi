@@ -46,15 +46,13 @@ author:
 
 EXAMPLES = '''
 
-  - name: Read CSV and return as ansible_facts
-    hosts: localhost
-    vars:
-      ifile: "./files/aci_tenant_policy.csv"
- 
-      TEST DATA
-      spreadsheet = [ {'Tenant':'INTERNAL', 'BD': 'BD1', 'VRF': 'green', 'subnet': ''},
-                      {'Tenant':'EXTERNAL', 'BD': 'BD2', 'VRF': 'blue', 'subnet': '198.51.100.1/24'},
-                      {'Tenant':'INTERNAL', 'BD': 'BD1', 'VRF': 'green', 'subnet': '192.0.2.1/24'}  ]
+    Given an input CSV file:
+    
+    appliance,name,address,partition,port
+    10.255.138.87,NEW_NODE1,192.0.2.1,Common,80
+    10.255.138.87,NEW_NODE2,198.51.100.1,Common,80
+    10.255.138.87,NEW_NODE1,192.0.2.1,Common,443
+
     tasks:
     - name: Get facts from CSV file
       csv_to_facts:
@@ -68,6 +66,9 @@ EXAMPLES = '''
           - VRF_fields
               - Tenant
               - VRF
+
+
+
 
 '''
 
@@ -98,7 +99,7 @@ class virt_spreadsheet(object):
                 try:
                     virt_row[column_header] = row[column_header] 
                 except KeyError:
-                    self.error = 'column requested does not exist'
+                    self.error = 'column requested, "{}", does not exist'.format(column_header)
 
             self.virt_set.add(tuple(virt_row.items()))            
         for item in self.virt_set:
@@ -128,7 +129,7 @@ def read_csv_dict(input_file, table_name, vsheets):
     # Optionally create virtual spreadsheets with a unique row for the values 
     #
     for item in vsheets:
-        if len(item) not == 1:
+        if len(item) is not 1:
             return(ERROR, "only one virtual sheet name per item")
            
         obj = virt_spreadsheet(item.keys()[0], item[item.keys()[0]], spreadsheet[table_name])
@@ -152,6 +153,9 @@ def main():
                  vsheets=dict(default=[], required=False, type='list')
                  ),
                  add_file_common_args=True)
+
+    if module.params['vsheets'] is None:
+        module.params['vsheets'] = []                      # argument "vsheets" specified, but with no data
 
     code, response = read_csv_dict(module.params["src"],
                                    module.params["table"],
