@@ -88,16 +88,20 @@ class virt_spreadsheet(object):
         self.spreadsheet = spreadsheet
         self.virt_set = set()
         self.virt_sheet = []
-        
+        self.error = None
+
     def populate_sheet(self):
         for row in self.spreadsheet:
             virt_row = {}
             for column_header in self.values:
-                virt_row[column_header] = row[column_header] 
+                try:
+                    virt_row[column_header] = row[column_header] 
+                except KeyError:
+                    self.error = 'they asked for a column which does not exist in the spreadsheet'
+
             self.virt_set.add(tuple(virt_row.items()))            
         for item in self.virt_set:
             self.virt_sheet.append(dict(item))
-
 
 
 def read_csv_dict(input_file, table_name, unique, vsheets):
@@ -124,6 +128,8 @@ def read_csv_dict(input_file, table_name, unique, vsheets):
     for ask in vsheets:
         obj = virt_spreadsheet(ask.get('name'), ask.get('values'), spreadsheet[table_name])
         obj.populate_sheet()
+        if obj.error:
+          return (1, obj.error)
         spreadsheet[ask.get('name')] = obj.virt_sheet
 
     #
