@@ -70,6 +70,17 @@ class virt_spreadsheet(object):
     """
         Given a spreadsheet, we take each name and values entered as arguments, and
         create a virtual spreadsheet
+        ### ask
+          - name: BD_fields
+            fields: 
+              - Tenant
+              - VRF
+              - BD
+          - name: VRF_fields
+            fields:
+              - Tenant
+              - VRF
+              
     """
     def __init__(self, name, values, spreadsheet):
         self.name = name
@@ -77,6 +88,7 @@ class virt_spreadsheet(object):
         self.spreadsheet = spreadsheet
         self.virt_set = set()
         self.virt_sheet = []
+        
     def populate_sheet(self):
         for row in self.spreadsheet:
             virt_row = {}
@@ -106,12 +118,17 @@ def read_csv_dict(input_file, table_name, unique, vsheets):
 
     csvfile.close()
 
+    #
+    #  Create virtual sheets
+    #
     for ask in vsheets:
         obj = virt_spreadsheet(ask.get('name'), ask.get('values'), spreadsheet[table_name])
         obj.populate_sheet()
         spreadsheet[ask.get('name')] = obj.virt_sheet
 
-    
+    #
+    #  Unique values for each column.
+    #
     spreadsheet[unique] = create_set(spreadsheet[table_name])
 
     result["ansible_facts"] = spreadsheet
@@ -162,127 +179,12 @@ def main():
 
 
 main()
+
 ##############################################################################################################
 
-
-def createlistoflist():
-join = []
-join.append([ 'Tenant', 'VRF'])
-join.append(['Tenant', 'VRF', 'BD'])
-join
-
-
-# create the key (column header)
-DELIMIT = ':'
-for list in join:
-    header = DELIMIT
-    for item in list:
-        header = header + item + DELIMIT
-    header = header.strip(DELIMIT)
-    return
-
-    'Tenant:VRF:BD'
-
-
+"""
+TEST DATA
 spreadsheet = [ {'Tenant':'WWT-INT', 'BD': 'WWT-BD1', 'VRF': 'WWT-VRF1'},
                 {'Tenant':'WWT-EXT', 'BD': 'WWT-BD2', 'VRF': 'WWT-VRF1'},
                 {'Tenant':'WWT-INT', 'BD': 'WWT-BD1', 'VRF': 'WWT-VRF1'}  ]
-
-# create the value for a given key
-def create_value(column_headers):
-
-    value = {}
-    
-
-###
-### main logic
-###
-
-### User enters a list of dictionaries
 """
-  - name: BD_fields
-    fields: 
-      - Tenant
-      - VRF
-      - BD
-  - name: VRF_fields
-    fields:
-      - Tenant
-      - VRF
-      
-"""
-joins = {}
-joins['BD_fields'] = ['Tenant', 'VRF', 'BD']
-joins['VRF_fields'] = ['Tenant', 'VRF']
-
-
-class virt_spreadsheet(object):
-    """
-        Given a spreadsheet, we take each name and values entered as arguments, and
-        create a virtual spreadsheet
-    """
-    def __init__(self, name, values, spreadsheet):
-        self.name = name
-        self.values = values
-        self.spreadsheet = spreadsheet
-        self.virt_sheet = []
-    def populate_sheet(self):
-        for row in self.spreadsheet:
-            virt_row = {}
-            for column_header in values:
-                virt_row[column_header] = row[column_header] 
-            self.virt_sheet.append(virt_row)            
-
-
-
-    def create_set(rows, joins):
-    """
-        Return a dictionary with the column headers as keys, and the values are a
-        list of unique values found in the rows of the spreadsheet for the column
-        header (a set).
-
-    """
-    virtual_hdrs = {}                                   # create empty dictionary
-    for key in rows[0].keys():                          # get column headers
-        virtual_hdrs[key] = set()                        # create empty set for each header
-
-    for row in rows:                                       # loop thru spreadsheet
-        for key in row.keys():                             # for each column
-            virtual_hdrs[key].add(row[key])              # populate the unique values
-
-    return virtual_hdrs
-
-
-
-#############################################
-# Create a new row for the values of interest
-#
-def create_new_row(row, fields):
-    """
-      row: dictionary of the columns and values
-      fields: list of the fields for the new row
-    """ 
-    new_row = {}
-    for field in fields:
-        new_row[field] = row[field]
-    return tuple(new_row.items())
-
-
-
-
-
-
-
-
-
-
-
-
-s = set()
-for row in spreadsheet:
-    s.add(tuple(row.items()))
-
-# for each item in the set, create a row 
-for item in s:
-    row = dict(item)
-    print row    
