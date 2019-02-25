@@ -205,12 +205,12 @@ def main():
                  ),
                  add_file_common_args=True)
 
-    if module.params['vsheets'] is None:                   # argument "vsheets" specified, but with no data
-        module.params['vsheets'] = []                      # rather than error, set as null list and continue
+    if module.params["vsheets"] is None:                   # argument "vsheets" specified, but with no data
+        module.params["vsheets"] = []                      # rather than error, set as null list and continue
 
     code, response = read_csv_dict(module.params["src"],
                                    module.params["table"],
-                                   module.params['vsheets'])
+                                   module.params["vsheets"])
     if code == ERROR:
         module.fail_json(msg=response)
     else:
