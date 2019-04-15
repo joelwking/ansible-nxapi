@@ -1,13 +1,16 @@
 # ansible-nxapi
 Ansible modules for managing Nexus switches using feature nxapi.
 
+
 ## nxapi_install_config
+
+THIS CONTENT HAS BEEN DEPRECATED! Please refer to the Ansible Networking Modules for managing Nexus switches.
 
 This module reads a configuration file and uses the nxapi feature to push the configuration using the nxapi interface. The module writes a log file to the /tmp directory and imbeds the julian date and userid running the module in the file name. There is a debug option which can be enabled to display the commands sent to the switch.  By using the debug option and commands which fail can be easily identified.
 
 The design of the module is be a general purpose configuration tool, the user must create a valid series of commands for the switch. This is in contrast to other nx-api modules which implement a specific function using the arguments passed to the module. The use case for nxapi_install_config is to demonstrate the functionaly of the nx-api interface and to apply initial configurations to switches. On going operations might be better served from the modules found at 
 
-[CiscoDevNet/nxos-ansible] (https://github.com/CiscoDevNet/nxos-ansible)
+[CiscoDevNet/nxos-ansible](https://github.com/CiscoDevNet/nxos-ansible)
 
 ## csv_to_facts
 
