@@ -1,6 +1,0 @@
-SourceDeviceHostname,SourcePort,SourceIP,VLAN,Speed,DestinationDeviceHostname,DestinationPort,Note
-13leafzn02-rp01,E1/10,none,10,1000,Spine-101,Ethernet1/10,"This is a note"
-13leafzn02-rp01,E1/11,none,10,1000,Spine-101,Ethernet1/9,"Mary had a little lamb"
-13leafzn02-rp01,E1/12,none,10,1000,Spine-101,Ethernet1/18,"The quick brown fox"
-13leafzn02-rp01,E1/13,none,30,1000,Spine-102,Ethernet1/14,"jumped over the lazy dog"
-13leafzn02-rp01,E1/14,none,30,1000,Spine-102,Ethernet1/13,"my dog has fleas"

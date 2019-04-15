@@ -1,7 +1,0 @@
----
-- name: Test  Role
-  hosts: asante 
-
-  roles:
-    - {role: excel_nxos, debug: on} 
-
